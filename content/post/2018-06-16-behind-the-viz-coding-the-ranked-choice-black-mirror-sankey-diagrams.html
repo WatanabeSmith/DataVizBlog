@@ -1,0 +1,334 @@
+---
+title: 'Behind the Viz: Coding the ranked-choice Black Mirror Sankey diagrams'
+author: Kevin Watanabe-Smith
+date: '2018-06-16'
+slug: behind-the-viz-coding-the-ranked-choice-black-mirror-sankey-diagrams
+categories: []
+tags:
+  - R
+  - black mirror
+  - politics
+  - ggalluvial
+  - vignette
+header:
+  caption: ''
+  image: ''
+---
+
+
+
+<p>My latest blog post covered using Ranked-Choice voting and reddit user rankings to determine the (second) best Black Mirror Episode. The key visualization was the Sankey diagram, and in this vignette I’ll walk through my R code for how the chart was made.</p>
+<div id="libraries-and-packages" class="section level2">
+<h2>Libraries and Packages</h2>
+<pre class="r"><code>library(tidyverse)
+library(forcats)
+library(magrittr)
+library(knitr)
+
+library(alluvial)
+library(ggalluvial)
+library(extrafont)
+colortable &lt;- read_csv(&quot;c:/Users/blaze/Documents/R_Projects/BlackMirror/color_palette.csv&quot;)</code></pre>
+<p>Lots of packages here:</p>
+<ul>
+<li>Tidyverse - all encompassing package for data manipulation and visualization</li>
+<li>forcats - enables better ordering of factor variables (episode names) when plotting</li>
+<li>magrittr - I did some in-line code, and magritter has some functions like multiply_by() that allow you to perform arithmetic in a %&gt;% pipeline</li>
+<li>knitr - For kable tables</li>
+<li>extrafont - Loading of other fonts</li>
+<li>alluvial - necessary for Sankey plots</li>
+<li><a href="https://cran.r-project.org/web/packages/ggalluvial/vignettes/ggalluvial.html">ggaluvial</a> - enables Sankey plots</li>
+</ul>
+<p>Also I have my color palette for each episode. You don’t want to know how these colors were chosen<a href="#fn1" class="footnoteRef" id="fnref1"><sup>1</sup></a>.</p>
+</div>
+<div id="loading-data" class="section level2">
+<h2>Loading Data</h2>
+<p>You’ll need to download the raw user rankings off my <a href="https://github.com/WatanabeSmith/BlackMirrorRanked/blob/master/CompiledRedditRanks.csv">github</a>. The only data manipulation is pivoting the data from “wide” to “long” format<a href="#fn2" class="footnoteRef" id="fnref2"><sup>2</sup></a>.</p>
+<p>The gather() function pivots the data, we name “episodes” as the key (what the column names will be called) and rankings as the values (what the data in those columns will now be called), while telling the function to not mess with the columns user, other, or id.</p>
+<pre class="r"><code>rawranks &lt;- read_csv(&quot;c:/Users/blaze/Documents/R_Projects/BlackMirror/CompiledRedditRanks.csv&quot;)
+
+head(rawranks)
+## # A tibble: 6 x 22
+##   user       other      id `White Christma~ `San Junipero` `USS Callister`
+##   &lt;chr&gt;      &lt;chr&gt;   &lt;int&gt;            &lt;int&gt;          &lt;int&gt;           &lt;int&gt;
+## 1 TheOnlyOn~ &lt;NA&gt;        1                1              4               8
+## 2 [deleted]  &lt;NA&gt;        2                5              3               8
+## 3 Seacattle~ &lt;NA&gt;        3                3              7               1
+## 4 loonwin    IMDB        4                1              4               7
+## 5 loonwin    Hollyw~     5               10              3               5
+## 6 loonwin    PC Mag      6                2              4               6
+## # ... with 16 more variables: `Hang the DJ` &lt;int&gt;, `Shut Up and
+## #   Dance` &lt;int&gt;, `White Bear` &lt;int&gt;, `The Entire History of You` &lt;int&gt;,
+## #   Nosedive &lt;int&gt;, `Black Museum` &lt;int&gt;, `Be Right Back` &lt;int&gt;, `Fifteen
+## #   Million Merits` &lt;int&gt;, `Hated in the Nation` &lt;int&gt;, Playtest &lt;int&gt;,
+## #   `The National Anthem` &lt;int&gt;, Arkangel &lt;int&gt;, Crocodile &lt;int&gt;, `Men
+## #   Against Fire` &lt;int&gt;, Metalhead &lt;int&gt;, `The Waldo Moment` &lt;int&gt;
+
+longranks &lt;- rawranks %&gt;% 
+  mutate(id = factor(id)) %&gt;% 
+  gather(key = episode, value = ranking, -user, -other, -id)
+
+head(longranks)
+## # A tibble: 6 x 5
+##   user              other     id    episode         ranking
+##   &lt;chr&gt;             &lt;chr&gt;     &lt;fct&gt; &lt;chr&gt;             &lt;int&gt;
+## 1 TheOnlyOne87      &lt;NA&gt;      1     White Christmas       1
+## 2 [deleted]         &lt;NA&gt;      2     White Christmas       5
+## 3 SeacattleMoohawks &lt;NA&gt;      3     White Christmas       3
+## 4 loonwin           IMDB      4     White Christmas       1
+## 5 loonwin           Hollywood 5     White Christmas      10
+## 6 loonwin           PC Mag    6     White Christmas       2</code></pre>
+</div>
+<div id="barplot-of-1st-place-votes" class="section level2">
+<h2>Barplot of 1st place votes</h2>
+<p>Now that we have long data, we’ll calculate what percentage of 1st place votes each episode recieved, and then plot that in a barplot.</p>
+<pre class="r"><code>
+#Count how many users ranked an episode #1
+n_users &lt;- longranks %&gt;% filter(ranking == 1) %&gt;% nrow()
+
+#Count votes by episode
+votecount &lt;- longranks %&gt;% 
+  # Limiting to only #1 choices
+  filter(ranking == 1) %&gt;% 
+  # group_by() decides how summarise() will work
+  group_by(episode) %&gt;% 
+  # Votes will be the raw number of votes, while pct will be divided by number of users 
+  summarise(votes = n(), pct = n() / n_users) %&gt;% 
+  arrange(desc(pct)) #Sort final dataframe
+
+votecolor &lt;- votecount %&gt;% 
+  #Join in palette table
+  left_join(colortable, by = &quot;episode&quot;)
+
+head(votecolor)
+## # A tibble: 6 x 4
+##   episode                   votes    pct color  
+##   &lt;chr&gt;                     &lt;int&gt;  &lt;dbl&gt; &lt;chr&gt;  
+## 1 White Christmas              25 0.225  #333D7A
+## 2 Shut Up and Dance            17 0.153  #C3AC46
+## 3 The Entire History of You    13 0.117  #B2A595
+## 4 San Junipero                 12 0.108  #8E548A
+## 5 Fifteen Million Merits        9 0.0811 #C11652
+## 6 Be Right Back                 8 0.0721 #5ED5EA
+
+# Barplot
+ggplot(votecolor, aes(
+  x = fct_inorder(episode), # Episodes along the x-axis, but as factors 
+  #and in order of appearance (which is first to last due to the arrange above)
+  y = pct,
+  color = color, fill = color)) +
+  scale_color_identity() + #Make the colors exactly as they appear in the color column
+  scale_fill_identity() +
+  geom_bar(stat = &quot;identity&quot;) +
+  theme(panel.background = element_blank(),
+        axis.ticks = element_blank(),
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        text = element_text(family = &quot;Century Gothic&quot;, face = &quot;bold&quot;),
+        plot.title = element_text(hjust = 0.5, size = 20),
+        plot.subtitle = element_text(hjust = 0.5, size = 16)) +  
+  xlab(&quot;&quot;) +
+  ylab(&quot;Percent of 1st place votes&quot;) +
+  labs(title = &quot;First Place Votes&quot;)</code></pre>
+<p><img src="/post/2018-06-16-behind-the-viz-coding-the-ranked-choice-black-mirror-sankey-diagrams_files/figure-html/unnamed-chunk-3-1.png" width="672" /></p>
+</div>
+<div id="plot-of-all-votes-by-episode" class="section level2">
+<h2>Plot of all votes by episode</h2>
+<p>To make the plot showing every vote for each episode (and summary details) we’ll group the data by episodes and calculate the mean ranking for each episode and order the data.</p>
+<pre class="r"><code>by_avg_ranks &lt;-longranks %&gt;% 
+  group_by(episode) %&gt;% 
+  summarise(avg_rank = mean(ranking, na.rm = TRUE)) %&gt;% 
+  arrange(avg_rank) %&gt;% 
+  mutate(episode = fct_inorder(episode)) #Set factor order after arrange()
+
+#add in color
+longcolor &lt;- longranks %&gt;% 
+  left_join(colortable, by = &quot;episode&quot;)
+
+
+ggplot(longcolor, aes(y = ranking, 
+                      # Set order of episodes on x-axis by level order in by_avg_ranks
+                      x = factor(episode, 
+                                 levels = levels(by_avg_ranks$episode)),
+                      color = color)) +
+  scale_color_identity() +
+  geom_boxplot(fill = NA, outlier.shape = NA) + 
+    #Outlier.shape = NA is important, without this we would have 
+    #duplication of outlier points since we&#39;re plotting every point anyways
+  geom_jitter(height = 0.2, width = 0.2, size = 3, alpha = 0.3) +
+    #Jitter allows us to see more of the points with a limited y-axis distortion
+  scale_y_reverse(breaks = c(1,5,10,15,19)) +
+  xlab(&quot;&quot;) +
+  ylab(&quot;Ranking&quot;) +
+  theme(axis.ticks = element_blank(),
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        text = element_text(family = &quot;Century Gothic&quot;, face = &quot;bold&quot;),
+        axis.text = element_text(angle = 45, hjust = 1),
+        panel.background = element_blank(),
+        plot.title = element_text(hjust = 0.5, size = 20),
+        plot.subtitle = element_text(hjust = 0.5, size = 16)) +
+  #Last, add in a black diamond for the mean rank of every episode
+  #which makes the ordering choice clearer 
+  geom_point(data = by_avg_ranks, aes(y = avg_rank),
+             pch = 18, size = 5, color = &quot;black&quot;) +
+  labs(title = &quot;All votes&quot;,
+       subtitle = &quot;(Mean ranking in black)&quot;)</code></pre>
+<p><img src="/post/2018-06-16-behind-the-viz-coding-the-ranked-choice-black-mirror-sankey-diagrams_files/figure-html/unnamed-chunk-4-1.png" width="672" /></p>
+</div>
+<div id="first-sankey-diagram" class="section level2">
+<h2>First Sankey diagram</h2>
+<p>So to make a Sankey diagram using ggalluvial we’ll need long data with columns for rounds of elimination (x-axis), the episodes (stratum), the id of the voter (alluvium), and the color choice.</p>
+<p>To start we’ll make dataframes for each round, and then merge them together with bind_rows().</p>
+<pre class="r"><code># This will sort the data on rakings
+# but only keep rows the first time an id appears
+# So only the top-ranked vote for each voter will be kept
+# Lastly we&#39;ll name the round as 0
+round0 &lt;- longcolor %&gt;% 
+  arrange(ranking) %&gt;% 
+  .[!duplicated(.$id),] %&gt;% 
+  mutate(round = 0)
+
+#Repeat the above for round 1, but remove White Christmas from consideration
+round1 &lt;- longcolor %&gt;% 
+  filter(episode != &quot;White Christmas&quot;) %&gt;% 
+  arrange(ranking) %&gt;% 
+  .[!duplicated(.$id),] %&gt;% 
+  mutate(round = 1)
+
+# Bind data together
+hammElimination &lt;- bind_rows(round0, round1)
+
+hammElimination[109:114,]
+## # A tibble: 6 x 7
+##   user          other id    episode          ranking color   round
+##   &lt;chr&gt;         &lt;chr&gt; &lt;fct&gt; &lt;chr&gt;              &lt;int&gt; &lt;chr&gt;   &lt;dbl&gt;
+## 1 bjt005        &lt;NA&gt;  42    Arkangel               1 #516876     0
+## 2 LibGyps       &lt;NA&gt;  17    Crocodile              1 #7D99A4     0
+## 3 bigbluemonkey &lt;NA&gt;  18    The Waldo Moment       1 #02B6FF     0
+## 4 loonwin       The W 15    San Junipero           1 #8E548A     1
+## 5 malacology    &lt;NA&gt;  27    San Junipero           1 #8E548A     1
+## 6 Kr4d105s2_3   &lt;NA&gt;  32    San Junipero           1 #8E548A     1</code></pre>
+<p>The actual Sankey diagram is just a normal ggplot call, with a few new aesthetic fields: stratum (groups along the y-axis) and alluvim (individual records, or in our case voter id numbers).</p>
+<pre class="r"><code>ggplot(hammElimination, 
+       aes(
+         x = round, 
+         stratum = episode, 
+         alluvium = id,              
+         fill = color, 
+         label = episode)) +
+  theme(panel.background = element_blank(),
+        axis.ticks = element_blank(),
+        axis.text.y = element_blank(),
+        axis.text.x = element_text(size = 12),
+        axis.title = element_blank(),
+        text = element_text(family = &quot;Century Gothic&quot;, face = &quot;bold&quot;),
+        plot.title = element_text(hjust = 0.5, size = 16),
+        plot.subtitle = element_text(hjust = 0.5, size = 12)) +
+  
+  #geom_flow plots the curved lines between rounds
+  geom_flow(stat = &quot;alluvium&quot;, lode.guidance = &quot;leftright&quot;) +
+  
+  #geom_stratum plots the larger &quot;static&quot; sections for each round
+  #size=0 removes the box around each stratum
+  geom_stratum(size = 0, color = NA, na.rm = TRUE) +
+  scale_fill_identity() +
+  ggtitle(&quot;Redistribution of White Christmas votes&quot;) +
+  labs(subtitle = &quot;Votes assigned to second choice&quot;) +
+  #Label the stratum with episode names
+  geom_text(stat = &quot;stratum&quot;, family = &quot;Century Gothic&quot;, fontface = &quot;bold&quot;, color = &quot;gray15&quot;, size = 2) +
+  scale_x_continuous(breaks = c(0,1), labels = c(&quot;With Hamm&quot;,&quot;Without Hamm&quot;))</code></pre>
+<p><img src="/post/2018-06-16-behind-the-viz-coding-the-ranked-choice-black-mirror-sankey-diagrams_files/figure-html/unnamed-chunk-6-1.png" width="672" /></p>
+</div>
+<div id="running-ranked-choice-elimination" class="section level2">
+<h2>Running ranked-choice elimination</h2>
+<p>Alright, now a scalable way to run the full ranked-choice elimination so we can make the final chart.</p>
+<p>We’ll set up a few variables before entering a large while-for loop. We’ll need a dataframe with the voter ids and a list of the episodes (“candidates” or voting options). I’m also starting empty vectors to store the user id, episode choice, and round number later on.</p>
+<pre class="r"><code>voter_ids &lt;- longcolor %&gt;% 
+  select(all_ids = id) %&gt;% unique()
+
+episode_list &lt;- longcolor %&gt;% 
+  filter(episode != &quot;White Christmas&quot;) %&gt;% 
+  select(episode) %&gt;% unique() %&gt;% .$episode %&gt;% as.character()
+
+user &lt;- vector()
+r_ep &lt;- vector()
+r_round &lt;- vector()
+roundcounter &lt;- 0</code></pre>
+<p>The for() loop will filter down the vote list to only episodes still eligible to recieve votes (in the episode_list), remove any NA rankings, filter down to the single id under consideration in the loop, and then sort for the top ranking. The top episode is extracted and stored in the growing r_ep vector. I made the choice to record exhausted ballots (no eligible choice remaining) with “-”.</p>
+<p>After the for() loop, we combine the vectors into a dataframe. Then to find the episode with the least votes (that needs to be eliminated next) we filter down to the current round, count the number of votes for each episode, and keep only episodes with more votes than the current minimum. Those episodes are stored in episode_list and used for another iteration of the for() loop.</p>
+<p>This is all wrapped in a while() loop, that will terminate when there is only one episode left in the episode_list.</p>
+<pre class="r"><code>while(length(episode_list) &gt; 1){
+  roundcounter &lt;- roundcounter + 1
+  
+  for(i in voter_ids$all_ids) {
+    choice &lt;- longcolor %&gt;% 
+      filter(episode %in% episode_list) %&gt;% 
+      filter(!is.na(ranking)) %&gt;% 
+      filter(id == i) %&gt;% 
+      arrange(ranking) %&gt;% .$episode %&gt;% .[1]
+    
+    #if(is.na(choice)) {next}
+    if(is.na(choice)) {choice &lt;- &quot;-&quot;}
+    
+    user &lt;- append(user, i)
+    r_ep &lt;- append(r_ep, choice)
+    r_round &lt;- append(r_round, roundcounter)
+  }
+  
+  nonWC_elimination &lt;- data.frame(id = user, round = r_round, episode = r_ep) 
+  
+  episode_list &lt;- nonWC_elimination %&gt;% 
+    filter(r_round == roundcounter &amp;
+             !is.na(episode) &amp;
+             episode != &quot;-&quot;) %&gt;% 
+    group_by(episode) %&gt;% count() %&gt;% 
+    ungroup() %&gt;% filter(n &gt; min(n)) %&gt;% .$episode %&gt;% as.character()
+  
+  #print(episode_list)
+  
+}</code></pre>
+</div>
+<div id="final-sankey-diagram" class="section level2">
+<h2>Final Sankey diagram</h2>
+<p>Now we have some housekeeping, converting variables to factors and joining with our color palette and then plotting as above.</p>
+<pre class="r"><code>
+
+nonWC_elimination$episode &lt;- as.factor(nonWC_elimination$episode)
+nonWC_elimination$id &lt;- as.factor(nonWC_elimination$id)
+
+nonWC_elimination_color &lt;- nonWC_elimination %&gt;% left_join(colortable, by = &quot;episode&quot;)
+
+ggplot(data = 
+         nonWC_elimination_color, 
+       aes(x = round, stratum = episode, alluvium = id,
+                       fill = color, label = episode)) +
+  theme(panel.background = element_blank(),
+        axis.ticks = element_blank(),
+        axis.text.y = element_blank(),
+        axis.text.x = element_text(size = 12),
+        axis.title = element_blank(),
+        text = element_text(family = &quot;Century Gothic&quot;, face = &quot;bold&quot;),
+        plot.title = element_text(hjust = 0.5, size = 16),
+        plot.subtitle = element_text(hjust = 0.5, size = 12)) +
+  geom_flow(stat = &quot;alluvium&quot;, lode.guidance = &quot;leftright&quot;) +
+  geom_stratum(size = 0, color = NA, na.rm = TRUE) +
+  scale_fill_identity() +
+  ggtitle(&quot;Ranked Choice Voting for Black Mirror Episodes&quot;) +
+  labs(subtitle = &quot;Non-Jon Hamm edition&quot;) +
+  geom_text(stat = &quot;stratum&quot;, family = &quot;Century Gothic&quot;, fontface = &quot;bold&quot;, color = &quot;gray15&quot;, size = 3) +
+  scale_x_continuous(breaks = seq(1,10,1), labels = c(&quot;Round 1&quot;, &quot;Round 2&quot;, &quot;Round 3&quot;,
+                                                     &quot;Round 4&quot;, &quot;Round 5&quot;, &quot;Round 6&quot;,
+                                                     &quot;Round 7&quot;, &quot;Round 8&quot;, &quot;Round 9&quot;,
+                                                     &quot;Round 10&quot;))</code></pre>
+<p><img src="/post/2018-06-16-behind-the-viz-coding-the-ranked-choice-black-mirror-sankey-diagrams_files/figure-html/unnamed-chunk-9-1.png" width="672" /></p>
+<p>For the diagrams only showing a few rounds I took “data = nonWC_elimination_color” and added “%&gt;% filter(round &lt;= 4)” to restrict the dataset.</p>
+<p>If you’re interested in other resources for ggalluvial I’d recommend Jason Cory Brunson’s <a href="https://cran.r-project.org/web/packages/ggalluvial/vignettes/ggalluvial.html">vignette</a> for the package (which I heavily relied on). Check out my final post, or the <a href="https://github.com/WatanabeSmith/BlackMirrorRanked">github repo</a> for all of the underlying code and data. Thanks for reading!</p>
+</div>
+<div class="footnotes">
+<hr />
+<ol>
+<li id="fn1"><p>Well if you must know, I’m slightly color blind and while it doesn’t impact my life much it’s resulted in me never quite trusting my eye to pick colors. So instead I often take them from elsewhere with Adobe Color or the eyedropper tool.<br />
+For this project I used google image search to pull an iconic image from each episode. I then loaded that image into Adobe Color and selected a single color that I thought fit the image and was unique from the other options. So <em>White Christmas</em> is Jon Hamm’s suit, <em>San Junipero</em> is Kelly’s jacket, <em>Shut Up and Dance</em> is Kenney’s yellow-tinted glasses. It’s probably too tedious and not effective enough, but, it’s what I did.<a href="#fnref1">↩</a></p></li>
+<li id="fn2"><p>“wide” data is easier for manual entry and probably how you think about data if you usually use a spreadsheet.<br />
+“long” is not very visually appealing, but far easier to work with in R and plot with ggplot<a href="#fnref2">↩</a></p></li>
+</ol>
+</div>
