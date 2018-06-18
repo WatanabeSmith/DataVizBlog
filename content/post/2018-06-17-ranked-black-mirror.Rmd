@@ -414,4 +414,4 @@ _San Junipero_ picks up just over half of the votes from _The Entire History of 
 
 ![](/img/SanJunipero.gif)
 
-If you're interested in this analysis, you can find the raw data plus code for analysis and visualizations on [GitHub](https://github.com/WatanabeSmith/BlackMirrorRanked). In addition, I have a separate [post on this blog](https://watanabesmith.rbind.io/http://watanabesmith.rbind.io/post/behind-the-viz-ranked-black-mirror/) walking through making the Sankey diagrams using the [ggaluvial](https://cran.r-project.org/web/packages/ggalluvial/vignettes/ggalluvial.html) package in R.
+If you're interested in this analysis, you can find the raw data plus code for analysis and visualizations on [GitHub](https://github.com/WatanabeSmith/BlackMirrorRanked). In addition, I have a separate [post on this blog](https://watanabesmith.rbind.io/post/behind-the-viz-ranked-black-mirror/) walking through making the Sankey diagrams using the [ggaluvial](https://cran.r-project.org/web/packages/ggalluvial/vignettes/ggalluvial.html) package in R.
