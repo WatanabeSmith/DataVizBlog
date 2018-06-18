@@ -406,7 +406,9 @@ round10votecount <- nonWC_elimination_color %>% filter(round == 10) %>%
   group_by(episode) %>% 
   summarise(votes = n(), pct = round(n()/round10totalvotes,3) * 100) %>% 
   arrange(desc(pct))
-
+```
+[Larger Image](https://raw.githubusercontent.com/WatanabeSmith/BlackMirrorRanked/master/BlackMirrorRankedSankey.png)
+```{r}
 kable(round10votecount)
 ```
 
