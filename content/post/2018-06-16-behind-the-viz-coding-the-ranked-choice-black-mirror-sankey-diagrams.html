@@ -2,7 +2,7 @@
 title: 'Behind the Viz: Coding the ranked-choice Black Mirror Sankey diagrams'
 author: Kevin Watanabe-Smith
 date: '2018-06-16'
-slug: behind-the-viz-coding-the-ranked-choice-black-mirror-sankey-diagrams
+slug: behind-the-viz-ranked-black-mirror
 categories: []
 tags:
   - R
@@ -17,7 +17,7 @@ header:
 
 
 
-<p>My latest blog post covered using Ranked-Choice voting and reddit user rankings to determine the (second) best Black Mirror Episode. The key visualization was the Sankey diagram, and in this vignette I’ll walk through my R code for how the chart was made.</p>
+<p>My latest <a href="http://watanabesmith.rbind.io/post/ranked-black-mirror/">blog post</a> covered using Ranked-Choice voting and reddit user rankings to determine the (second) best Black Mirror Episode. The key visualization was the Sankey diagram, and in this vignette I’ll walk through my R code for how the chart was made.</p>
 <div id="libraries-and-packages" class="section level2">
 <h2>Libraries and Packages</h2>
 <pre class="r"><code>library(tidyverse)
@@ -321,7 +321,7 @@ ggplot(data =
                                                      &quot;Round 10&quot;))</code></pre>
 <p><img src="/post/2018-06-16-behind-the-viz-coding-the-ranked-choice-black-mirror-sankey-diagrams_files/figure-html/unnamed-chunk-9-1.png" width="672" /></p>
 <p>For the diagrams only showing a few rounds I took “data = nonWC_elimination_color” and added “%&gt;% filter(round &lt;= 4)” to restrict the dataset.</p>
-<p>If you’re interested in other resources for ggalluvial I’d recommend Jason Cory Brunson’s <a href="https://cran.r-project.org/web/packages/ggalluvial/vignettes/ggalluvial.html">vignette</a> for the package (which I heavily relied on). Check out my final post, or the <a href="https://github.com/WatanabeSmith/BlackMirrorRanked">github repo</a> for all of the underlying code and data. Thanks for reading!</p>
+<p>If you’re interested in other resources for ggalluvial I’d recommend Jason Cory Brunson’s <a href="https://cran.r-project.org/web/packages/ggalluvial/vignettes/ggalluvial.html">vignette</a> for the package (which I heavily relied on). Check out my <a href="http://watanabesmith.rbind.io/post/ranked-black-mirror/">final post</a>, or the <a href="https://github.com/WatanabeSmith/BlackMirrorRanked">github repo</a> for all of the underlying code and data. Thanks for reading!</p>
 </div>
 <div class="footnotes">
 <hr />
